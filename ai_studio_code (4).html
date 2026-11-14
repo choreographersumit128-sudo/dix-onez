@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DIX ONZE (1011) | Standalone Admin Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen font-sans">
+
+  <header class="h-16 bg-zinc-900 border-b border-zinc-800 px-6 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="px-2.5 py-0.5 bg-amber-400 text-black text-[10px] font-bold uppercase tracking-widest">ADMIN</span>
+      <h1 class="font-semibold text-sm tracking-wider">DIX ONZE (1011) — STANDALONE ADMIN PANEL</h1>
+    </div>
+    <span class="text-xs text-emerald-400">● Firebase Real-Time Sync Active</span>
+  </header>
+
+  <main class="max-w-7xl mx-auto p-6 space-y-6">
+    <div class="flex flex-wrap gap-2 border-b border-zinc-800 pb-4 text-xs font-bold uppercase tracking-wider">
+      <button data-tab="requests" class="tab-btn px-4 py-2.5 rounded bg-amber-400 text-black">Requests & Approvals</button>
+      <button data-tab="resellers" class="tab-btn px-4 py-2.5 rounded bg-zinc-900 text-zinc-400">Resellers, Penalty & Ban</button>
+      <button data-tab="qr" class="tab-btn px-4 py-2.5 rounded bg-zinc-900 text-zinc-400">QR Code & Site Settings</button>
+      <button data-tab="products" class="tab-btn px-4 py-2.5 rounded bg-zinc-900 text-zinc-400">Products</button>
+      <button data-tab="orders" class="tab-btn px-4 py-2.5 rounded bg-zinc-900 text-zinc-400">Orders</button>
+    </div>
+
+    <!-- TAB 1: PENDING REGISTRATION & TOP-UP REQUESTS -->
+    <section id="tab-requests" class="tab-panel space-y-8">
+      <div class="space-y-3">
+        <h2 class="text-base font-semibold text-amber-400">
+          Pending Rs. 500 Reseller Registrations (<span id="reg-req-count">0</span>)
+        </h2>
+        <div id="reg-requests-list" class="grid md:grid-cols-2 gap-4"></div>
+      </div>
+
+      <div class="space-y-3">
+        <h2 class="text-base font-semibold text-emerald-400">
+          Pending Wallet Top-Up Requests (<span id="topup-req-count">0</span>)
+        </h2>
+        <div id="topup-requests-list" class="grid md:grid-cols-2 gap-4"></div>
+      </div>
+    </section>
+
+    <!-- TAB 2: RESELLER DIRECTORY, MANUAL ADD, PENALTY & BAN SYSTEM -->
+    <section id="tab-resellers" class="tab-panel hidden space-y-8">
+      <div class="bg-zinc-900 border border-zinc-800 p-6 rounded space-y-4">
+        <h2 class="text-base font-semibold text-amber-400">Add New Reseller Directly (Auto-Generate DIX-XXXX ID)</h2>
+        <form id="add-reseller-form" class="grid md:grid-cols-4 gap-3 text-sm">
+          <input id="ar-name" required placeholder="Reseller Name *" class="bg-zinc-950 border border-zinc-800 px-3 py-2.5 rounded" />
+          <input id="ar-shop" required placeholder="Shop Name *" class="bg-zinc-950 border border-zinc-800 px-3 py-2.5 rounded" />
+          <input id="ar-whatsapp" required placeholder="WhatsApp Number *" class="bg-zinc-950 border border-zinc-800 px-3 py-2.5 rounded" />
+          <button type="submit" id="ar-submit-btn" class="bg-amber-400 text-black font-bold text-xs uppercase tracking-widest py-2.5 rounded hover:bg-amber-300">
+            Generate & Save
+          </button>
+        </form>
+        <div id="created-reseller-banner" class="hidden p-3 bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-300 rounded"></div>
+      </div>
+
+      <div class="space-y-3">
+        <h2 class="text-base font-semibold">Active & Banned Resellers (<span id="reseller-total-count">0</span>)</h2>
+        <div id="resellers-list" class="space-y-3"></div>
+      </div>
+    </section>
+
+    <!-- TAB 3: DIRECT QR CODE UPLOAD & SITE SETTINGS -->
+    <section id="tab-qr" class="tab-panel hidden bg-zinc-900 border border-zinc-800 p-6 rounded space-y-6">
+      <h2 class="text-base font-semibold text-amber-400">Direct Payment QR Code Upload & Storefront Settings</h2>
+      <div class="grid md:grid-cols-2 gap-6 items-start">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1.5">Upload QR Image from Device Gallery (Instant Base64 Sync)</label>
+            <input id="cfg-qr-file" type="file" accept="image/*" class="w-full bg-zinc-950 border border-dashed border-amber-400/50 px-3 py-3 text-xs rounded" />
+          </div>
+          <div class="grid grid-cols-2 gap-3 pt-2">
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Brand Name</label>
+              <input id="cfg-brand" value="DIX ONZE (1011)" class="w-full bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm rounded" />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Hero Headline</label>
+              <input id="cfg-hero-title" value="Quiet Luxury. Unthinkable Access." class="w-full bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm rounded" />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Background Color</label>
+              <input id="cfg-bg" type="color" value="#070707" class="w-full h-10 bg-zinc-950 rounded" />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-400 mb-1">Gold Accent Color</label>
+              <input id="cfg-accent" type="color" value="#D4AF37" class="w-full h-10 bg-zinc-950 rounded" />
+            </div>
+          </div>
+          <button id="save-cfg-btn" class="px-6 py-3 bg-amber-400 text-black text-xs font-bold uppercase tracking-widest rounded hover:bg-amber-300">
+            Save QR & Store Settings
+          </button>
+        </div>
+
+        <div class="bg-zinc-950 border border-zinc-800 p-6 text-center space-y-2 rounded">
+          <p class="text-xs text-zinc-400 uppercase tracking-widest">Live QR Shown in index.html</p>
+          <img id="admin-qr-preview" src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=DIX-ONZE-1011" alt="QR Preview" class="w-48 h-48 mx-auto bg-white p-2 object-contain" />
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: PRODUCT MANAGEMENT (DIRECT FILE UPLOAD + NORMAL/RESELLER PRICE) -->
+    <section id="tab-products" class="tab-panel hidden space-y-6">
+      <form id="add-product-form" class="bg-zinc-900 border border-zinc-800 p-6 rounded space-y-4">
+        <h2 class="text-base font-semibold text-amber-400">Add Product (Direct Device Image Upload)</h2>
+        <div class="grid md:grid-cols-3 gap-3 text-sm">
+          <input id="p-name" required placeholder="Product Name *" class="bg-zinc-950 border border-zinc-800 px-3 py-2 rounded" />
+          <input id="p-cat" required placeholder="Category (e.g., Outerwear) *" class="bg-zinc-950 border border-zinc-800 px-3 py-2 rounded" />
+          <input id="p-stock" type="number" value="30" required placeholder="Stock Qty *" class="bg-zinc-950 border border-zinc-800 px-3 py-2 rounded" />
+          <div>
+            <label class="text-[10px] text-zinc-400">Normal Price (Rs.) *</label>
+            <input id="p-normal" type="number" value="1500" required class="w-full bg-zinc-950 border border-zinc-800 px-3 py-2 rounded" />
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-400">Reseller Price (Rs.) *</label>
+            <input id="p-reseller" type="number" value="950" required class="w-full bg-zinc-950 border border-zinc-800 px-3 py-2 rounded" />
+          </div>
+          <div>
+            <label class="text-[10px] text-zinc-400">Crossed-Out Shock Price (Optional)</label>
+            <input id="p-shock" type="number" value="15000" class="w-full bg-zinc-950 border border-zinc-800 px-3 py-2 rounded" />
+          </div>
+          <div class="md:col-span-3">
+            <label class="block text-[10px] text-zinc-400 mb-1">Upload Product Image from Device Gallery *</label>
+            <input id="p-img-file" type="file" accept="image/*" required class="w-full bg-zinc-950 border border-dashed border-amber-400/50 px-3 py-2.5 text-xs rounded" />
+          </div>
+        </div>
+        <button type="submit" id="add-prod-btn" class="px-6 py-2.5 bg-amber-400 text-black text-xs font-bold uppercase tracking-widest rounded hover:bg-amber-300">
+          Save Product
+        </button>
+      </form>
+      <div id="admin-products-list" class="grid md:grid-cols-3 gap-4"></div>
+    </section>
+
+    <!-- TAB 5: ORDERS -->
+    <section id="tab-orders" class="tab-panel hidden space-y-4">
+      <h2 class="text-base font-semibold">Incoming Orders (<span id="admin-order-count">0</span>)</h2>
+      <div id="admin-orders-list" class="space-y-3"></div>
+    </section>
+  </main>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyARovMYi9lRmJGAOjx0eLjb3s2J-BP9xHA",
+      authDomain: "dix-onez.firebaseapp.com",
+      projectId: "dix-onez",
+      storageBucket: "dix-onez.firebasestorage.app",
+      messagingSenderId: "1014731252422",
+      appId: "1:1014731252422:web:0360894379505015c42dc7",
+      measurementId: "G-CMR2NCN2XK"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const fmt = (n) => "Rs. " + Number(n || 0).toLocaleString("en-NP");
+    const esc = (s) => String(s || "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+
+    function withTimeout(promise, ms = 12000) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Request timed out. Check internet or Firestore rules.")), ms))
+      ]);
+    }
+
+    function compressImageToBase64(file, maxDim = 550, quality = 0.65) {
+      return new Promise((resolve, reject) => {
+        if (!file) return reject(new Error("No image file selected."));
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Could not read image file."));
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onerror = () => reject(new Error("Invalid image file."));
+          img.onload = () => {
+            let w = img.width;
+            let h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+              else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Tab Navigation
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.onclick = () => {
+        document.querySelectorAll(".tab-btn").forEach((b) => (b.className = "tab-btn px-4 py-2.5 rounded bg-zinc-900 text-zinc-400"));
+        btn.className = "tab-btn px-4 py-2.5 rounded bg-amber-400 text-black";
+        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.add("hidden"));
+        document.getElementById("tab-" + btn.dataset.tab).classList.remove("hidden");
+      };
+    });
+
+    async function generateUniqueId() {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      for (let t = 0; t < 6; t++) {
+        let code = "";
+        for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+        const candidate = "DIX-" + code;
+        const snap = await db.collection("resellers").doc(candidate).get();
+        if (!snap.exists) return candidate;
+      }
+      return "DIX-" + Date.now().toString().slice(-4);
+    }
+
+    async function createResellerRecord({ name, shopName, whatsapp }) {
+      const resellerId = await generateUniqueId();
+      await withTimeout(db.collection("resellers").doc(resellerId).set({
+        resellerId,
+        name,
+        shopName,
+        whatsapp,
+        walletBalance: 0,
+        banStatus: "active",
+        warnings: [],
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }));
+      return resellerId;
+    }
+
+    // 1. Direct Add Reseller Form
+    document.getElementById("add-reseller-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("ar-submit-btn");
+      btn.disabled = true;
+      btn.textContent = "Generating...";
+      try {
+        const name = document.getElementById("ar-name").value.trim();
+        const shopName = document.getElementById("ar-shop").value.trim();
+        const whatsapp = document.getElementById("ar-whatsapp").value.trim();
+        const newId = await createResellerRecord({ name, shopName, whatsapp });
+
+        const banner = document.getElementById("created-reseller-banner");
+        banner.innerHTML = `Created! Reseller ID: <strong class="font-mono text-sm text-white">${esc(newId)}</strong> (Initial Wallet: Rs. 0)`;
+        banner.classList.remove("hidden");
+        e.target.reset();
+        alert(`Reseller created! ID: ${newId}`);
+      } catch (err) {
+        alert("Error: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Generate & Save";
+      }
+    };
+
+    // 2. Pending Rs. 500 Registration Requests (with Screenshot Preview)
+    db.collection("reseller_registrations").orderBy("createdAt", "desc").onSnapshot((snap) => {
+      const pending = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => r.status === "pending");
+      document.getElementById("reg-req-count").textContent = pending.length;
+      const wrap = document.getElementById("reg-requests-list");
+
+      wrap.innerHTML = pending.length === 0
+        ? '<p class="text-xs text-zinc-500">No pending Rs. 500 registration requests.</p>'
+        : pending.map((r) => `
+          <div class="bg-zinc-900 border border-amber-500/40 p-4 rounded flex gap-4 text-xs">
+            ${r.screenshotBase64 ? `<img src="${r.screenshotBase64}" onclick="window.open(this.src)" title="Click to zoom" class="w-24 h-28 object-cover border border-zinc-700 cursor-pointer shrink-0" />` : ""}
+            <div class="flex-1 space-y-1.5">
+              <div class="flex justify-between">
+                <strong class="text-sm text-amber-400">${esc(r.shopName)}</strong>
+                <span class="text-emerald-400 font-bold">Fee: Rs. 500</span>
+              </div>
+              <p class="text-zinc-300">Name: ${esc(r.name)}</p>
+              <p class="text-zinc-400">WhatsApp: ${esc(r.whatsapp)}</p>
+              <div class="flex gap-2 pt-2">
+                <button data-approve-reg="${esc(r.id)}" class="px-3 py-1.5 bg-emerald-500 text-black font-bold uppercase rounded">Approve & Generate ID</button>
+                <button data-reject-reg="${esc(r.id)}" class="px-3 py-1.5 bg-red-600 text-white font-bold uppercase rounded">Reject</button>
+              </div>
+            </div>
+          </div>`).join("");
+
+      wrap.querySelectorAll("[data-approve-reg]").forEach((b) => {
+        b.onclick = async () => {
+          const req = pending.find((x) => x.id === b.dataset.approveReg);
+          if (!req) return;
+          b.disabled = true;
+          b.textContent = "Approving...";
+          try {
+            const newId = await createResellerRecord({ name: req.name, shopName: req.shopName, whatsapp: req.whatsapp });
+            await withTimeout(db.collection("reseller_registrations").doc(req.id).update({ status: "approved", assignedResellerId: newId }));
+            alert(`Approved! Reseller ID: ${newId} generated for ${req.name} (${req.whatsapp}).`);
+          } catch (err) {
+            alert("Approval Error: " + err.message);
+          } finally {
+            b.disabled = false;
+            b.textContent = "Approve & Generate ID";
+          }
+        };
+      });
+      wrap.querySelectorAll("[data-reject-reg]").forEach((b) => {
+        b.onclick = async () => {
+          try { await withTimeout(db.collection("reseller_registrations").doc(b.dataset.rejectReg).update({ status: "rejected" })); }
+          catch (err) { alert("Error: " + err.message); }
+        };
+      });
+    });
+
+    // 3. Pending Top-Up Requests (with Payment Method & Screenshot Preview)
+    db.collection("topup_requests").orderBy("createdAt", "desc").onSnapshot((snap) => {
+      const pending = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => r.status === "pending");
+      document.getElementById("topup-req-count").textContent = pending.length;
+      const wrap = document.getElementById("topup-requests-list");
+
+      wrap.innerHTML = pending.length === 0
+        ? '<p class="text-xs text-zinc-500">No pending top-up requests.</p>'
+        : pending.map((r) => `
+          <div class="bg-zinc-900 border border-emerald-500/40 p-4 rounded flex gap-4 text-xs">
+            ${r.screenshotBase64 ? `<img src="${r.screenshotBase64}" onclick="window.open(this.src)" title="Click to zoom" class="w-24 h-28 object-cover border border-zinc-700 cursor-pointer shrink-0" />` : ""}
+            <div class="flex-1 space-y-1.5">
+              <div class="flex justify-between">
+                <strong class="text-sm text-amber-400 font-mono">${esc(r.resellerId)}</strong>
+                <span class="text-emerald-400 font-bold text-sm">${fmt(r.amount)}</span>
+              </div>
+              <p class="text-zinc-300">${esc(r.name)} (${esc(r.shopName)})</p>
+              <p class="text-zinc-400">Method: <strong class="text-white">${esc(r.paymentMethod || "QR")}</strong> • WA: ${esc(r.whatsapp)}</p>
+              <div class="flex gap-2 pt-2">
+                <button data-approve-topup="${esc(r.id)}" class="px-3 py-1.5 bg-emerald-500 text-black font-bold uppercase rounded">Approve & Add Rs. ${Number(r.amount)}</button>
+                <button data-reject-topup="${esc(r.id)}" class="px-3 py-1.5 bg-red-600 text-white font-bold uppercase rounded">Reject</button>
+              </div>
+            </div>
+          </div>`).join("");
+
+      wrap.querySelectorAll("[data-approve-topup]").forEach((b) => {
+        b.onclick = async () => {
+          const req = pending.find((x) => x.id === b.dataset.approveTopup);
+          if (!req) return;
+          b.disabled = true;
+          b.textContent = "Crediting...";
+          try {
+            await withTimeout(db.runTransaction(async (tx) => {
+              const reqRef = db.collection("topup_requests").doc(req.id);
+              const rRef = db.collection("resellers").doc(req.resellerId);
+              const rSnap = await tx.get(rRef);
+              if (!rSnap.exists) throw new Error("Reseller ID not found.");
+              const cur = Number(rSnap.data().walletBalance || 0);
+              tx.update(rRef, { walletBalance: cur + Number(req.amount) });
+              tx.update(reqRef, { status: "approved" });
+            }));
+            alert(`Added ${fmt(req.amount)} to ${req.resellerId}'s wallet!`);
+          } catch (err) {
+            alert("Top-up Approval Error: " + err.message);
+          } finally {
+            b.disabled = false;
+          }
+        };
+      });
+      wrap.querySelectorAll("[data-reject-topup]").forEach((b) => {
+        b.onclick = async () => {
+          try { await withTimeout(db.collection("topup_requests").doc(b.dataset.rejectTopup).update({ status: "rejected" })); }
+          catch (err) { alert("Error: " + err.message); }
+        };
+      });
+    });
+
+    // 4. Reseller Directory, Manual Add/Penalty & Ban Toggle
+    async function adjustWallet(resellerId, delta, reason) {
+      try {
+        await withTimeout(db.runTransaction(async (tx) => {
+          const rRef = db.collection("resellers").doc(resellerId);
+          const snap = await tx.get(rRef);
+          if (!snap.exists) throw new Error("Reseller not found.");
+          const cur = Number(snap.data().walletBalance || 0);
+          const updates = { walletBalance: Math.max(0, cur + Number(delta)) };
+          if (delta < 0 && reason) {
+            updates.warnings = firebase.firestore.FieldValue.arrayUnion(`${reason} (-Rs. ${Math.abs(delta)})`);
+          }
+          tx.update(rRef, updates);
+        }));
+      } catch (err) {
+        alert("Wallet Update Error: " + err.message);
+      }
+    }
+
+    db.collection("resellers").orderBy("createdAt", "desc").onSnapshot((snap) => {
+      const resellers = snap.docs.map((d) => d.data());
+      document.getElementById("reseller-total-count").textContent = resellers.length;
+      const list = document.getElementById("resellers-list");
+
+      list.innerHTML = resellers.length === 0
+        ? '<p class="text-xs text-zinc-500">No resellers found.</p>'
+        : resellers.map((r) => {
+          const isBanned = r.banStatus === "banned";
+          return `
+          <div class="bg-zinc-900 border ${isBanned ? "border-red-700/70" : "border-zinc-800"} p-5 rounded space-y-3 text-xs">
+            <div class="flex flex-wrap justify-between items-center gap-4">
+              <div>
+                <span class="font-mono text-sm font-bold text-amber-400 mr-2">${esc(r.resellerId)}</span>
+                <span class="font-semibold text-sm">${esc(r.name)}</span>
+                <span class="text-zinc-400 ml-2">(${esc(r.shopName)} • WA: ${esc(r.whatsapp)})</span>
+                <p class="mt-1">
+                  Status: <span class="px-2 py-0.5 rounded font-bold uppercase ${isBanned ? "bg-red-900/60 text-red-300" : "bg-emerald-900/50 text-emerald-300"}">${isBanned ? "Banned" : "Active"}</span>
+                  ${r.warnings && r.warnings.length ? `<span class="text-amber-400 ml-2">Warnings: ${r.warnings.length}</span>` : ""}
+                </p>
+              </div>
+              <div class="text-right">
+                <p class="text-[10px] uppercase text-zinc-400">Current Wallet Balance</p>
+                <p class="text-xl font-bold text-emerald-400">${fmt(r.walletBalance)}</p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-3">
+              <input id="amt-${esc(r.resellerId)}" type="number" placeholder="Custom Rs." class="w-28 bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 rounded" />
+              <button data-add-bal="${esc(r.resellerId)}" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded">+ Add Balance</button>
+              <button data-pen-100="${esc(r.resellerId)}" class="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white font-semibold rounded">- Rs. 100 Penalty</button>
+              <button data-pen-200="${esc(r.resellerId)}" class="px-3 py-1.5 bg-amber-800 hover:bg-amber-700 text-white font-semibold rounded">- Rs. 200 Penalty</button>
+              <button data-pen-custom="${esc(r.resellerId)}" class="px-3 py-1.5 bg-orange-800 hover:bg-orange-700 text-white font-semibold rounded">- Custom Penalty</button>
+              <button data-ban-toggle="${esc(r.resellerId)}" data-cur="${esc(r.banStatus)}" class="ml-auto px-4 py-1.5 ${isBanned ? "bg-zinc-700 hover:bg-zinc-600" : "bg-red-700 hover:bg-red-600"} text-white font-bold uppercase rounded">
+                ${isBanned ? "UNBAN Reseller" : "BAN Reseller"}
+              </button>
+            </div>
+          </div>`;
+        }).join("");
+
+      list.querySelectorAll("[data-add-bal]").forEach((b) => {
+        b.onclick = async () => {
+          const input = document.getElementById("amt-" + b.dataset.addBal);
+          const val = Number(input.value) || Number(prompt("Enter amount (Rs.) to add:", "1000"));
+          if (val > 0) {
+            await adjustWallet(b.dataset.addBal, val);
+            input.value = "";
+          }
+        };
+      });
+      list.querySelectorAll("[data-pen-100]").forEach((b) => {
+        b.onclick = () => {
+          const reason = prompt("Reason for Rs. 100 penalty:", "Fake screenshot / Policy violation");
+          if (reason !== null) adjustWallet(b.dataset.pen100, -100, reason || "Penalty");
+        };
+      });
+      list.querySelectorAll("[data-pen-200]").forEach((b) => {
+        b.onclick = () => {
+          const reason = prompt("Reason for Rs. 200 penalty:", "Fake screenshot / Policy violation");
+          if (reason !== null) adjustWallet(b.dataset.pen200, -200, reason || "Penalty");
+        };
+      });
+      list.querySelectorAll("[data-pen-custom]").forEach((b) => {
+        b.onclick = () => {
+          const input = document.getElementById("amt-" + b.dataset.penCustom);
+          const amt = Number(input.value) || Number(prompt("Enter custom penalty amount (Rs.):", "300"));
+          if (!amt || amt <= 0) return;
+          const reason = prompt("Enter penalty reason:", "Rule violation");
+          if (reason !== null) {
+            adjustWallet(b.dataset.penCustom, -amt, reason || "Penalty");
+            input.value = "";
+          }
+        };
+      });
+      list.querySelectorAll("[data-ban-toggle]").forEach((b) => {
+        b.onclick = async () => {
+          const next = b.dataset.cur === "banned" ? "active" : "banned";
+          try {
+            await withTimeout(db.collection("resellers").doc(b.dataset.banToggle).update({ banStatus: next }));
+          } catch (err) {
+            alert("Ban Error: " + err.message);
+          }
+        };
+      });
+    });
+
+    // 5. Direct QR Code File Upload (Compressed Base64) & Site Settings
+    let pendingQrBase64 = null;
+
+    db.collection("settings").doc("siteConfig").onSnapshot((snap) => {
+      if (!snap.exists) return;
+      const cfg = snap.data();
+      if (cfg.qrCodeBase64) document.getElementById("admin-qr-preview").src = cfg.qrCodeBase64;
+      if (cfg.brandName) document.getElementById("cfg-brand").value = cfg.brandName;
+      if (cfg.heroTitle) document.getElementById("cfg-hero-title").value = cfg.heroTitle;
+      if (cfg.bgColor) document.getElementById("cfg-bg").value = cfg.bgColor;
+      if (cfg.accentColor) document.getElementById("cfg-accent").value = cfg.accentColor;
+    });
+
+    document.getElementById("cfg-qr-file").onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const base64 = await compressImageToBase64(file, 420, 0.75);
+        pendingQrBase64 = base64;
+        document.getElementById("admin-qr-preview").src = base64;
+        await withTimeout(db.collection("settings").doc("siteConfig").set({ qrCodeBase64: base64 }, { merge: true }));
+        alert("Payment QR Code uploaded and synced live to index.html!");
+      } catch (err) {
+        alert("QR Upload Error: " + err.message);
+      }
+    };
+
+    document.getElementById("save-cfg-btn").onclick = async () => {
+      const btn = document.getElementById("save-cfg-btn");
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+      try {
+        const payload = {
+          brandName: document.getElementById("cfg-brand").value.trim() || "DIX ONZE (1011)",
+          heroTitle: document.getElementById("cfg-hero-title").value.trim() || "Quiet Luxury. Unthinkable Access.",
+          bgColor: document.getElementById("cfg-bg").value,
+          accentColor: document.getElementById("cfg-accent").value,
+        };
+        if (pendingQrBase64) payload.qrCodeBase64 = pendingQrBase64;
+        await withTimeout(db.collection("settings").doc("siteConfig").set(payload, { merge: true }));
+        alert("Settings saved and synced live!");
+      } catch (err) {
+        alert("Settings Error: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Save QR & Store Settings";
+      }
+    };
+
+    // 6. Product Management (Direct File Upload -> Compressed Base64 -> Firestore)
+    document.getElementById("add-product-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("add-prod-btn");
+      const file = document.getElementById("p-img-file").files[0];
+      if (!file) return alert("Please select a product image from your device.");
+
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+      try {
+        const imageBase64 = await compressImageToBase64(file, 550, 0.65);
+        await withTimeout(db.collection("products").add({
+          name: document.getElementById("p-name").value.trim(),
+          category: document.getElementById("p-cat").value.trim(),
+          stock: Number(document.getElementById("p-stock").value),
+          normalPrice: Number(document.getElementById("p-normal").value),
+          resellerPrice: Number(document.getElementById("p-reseller").value),
+          shockPrice: Number(document.getElementById("p-shock").value || 0),
+          imageBase64,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }));
+        e.target.reset();
+        alert("Product added successfully!");
+      } catch (err) {
+        alert("Product Save Failed: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Save Product";
+      }
+    };
+
+    db.collection("products").orderBy("createdAt", "desc").onSnapshot((snap) => {
+      const products = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const wrap = document.getElementById("admin-products-list");
+      wrap.innerHTML = products.map((p) => {
+        const imgSrc = p.imageBase64 || p.imageUrl || "";
+        return `
+        <div class="bg-zinc-900 border border-zinc-800 p-4 rounded flex gap-3 text-xs">
+          <img src="${esc(imgSrc)}" class="w-16 h-20 object-cover" />
+          <div class="flex-1 space-y-1">
+            <p class="font-bold text-sm">${esc(p.name)}</p>
+            <p class="text-amber-400">Normal: ${fmt(p.normalPrice)}</p>
+            <p class="text-emerald-400">Reseller: ${fmt(p.resellerPrice)}</p>
+            <p class="text-zinc-400">Stock: ${Number(p.stock)}</p>
+            <div class="flex gap-3 pt-1">
+              <button data-stock-prod="${esc(p.id)}" data-cur-stock="${Number(p.stock)}" class="text-amber-300 hover:underline">+10 Stock</button>
+              <button data-del-prod="${esc(p.id)}" class="text-red-400 hover:underline">Delete</button>
+            </div>
+          </div>
+        </div>`;
+      }).join("");
+
+      wrap.querySelectorAll("[data-stock-prod]").forEach((b) => {
+        b.onclick = () => db.collection("products").doc(b.dataset.stockProd).update({ stock: Number(b.dataset.curStock) + 10 });
+      });
+      wrap.querySelectorAll("[data-del-prod]").forEach((b) => {
+        b.onclick = () => db.collection("products").doc(b.dataset.delProd).delete();
+      });
+    });
+
+    // 7. Orders Management
+    db.collection("orders").orderBy("createdAt", "desc").onSnapshot((snap) => {
+      const orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      document.getElementById("admin-order-count").textContent = orders.length;
+      const wrap = document.getElementById("admin-orders-list");
+      wrap.innerHTML = orders.length === 0
+        ? '<p class="text-xs text-zinc-500">No orders yet.</p>'
+        : orders.map((o) => `
+        <div class="bg-zinc-900 border border-zinc-800 p-4 rounded flex flex-wrap justify-between items-center gap-4 text-xs">
+          <div>
+            <span class="px-2 py-0.5 bg-amber-400/20 text-amber-300 font-bold uppercase mr-2">${esc(o.orderType)}</span>
+            <span class="font-bold text-sm">${esc(o.customerName)}</span>
+            ${o.resellerId ? `<span class="font-mono text-amber-400 ml-2">(${esc(o.resellerId)})</span>` : ""}
+            <p class="text-zinc-400 mt-1">${esc(o.deliveryLocation)} • Phone: ${esc(o.phone)} • ${o.totalPieces} pcs • ${fmt(o.totalAmount)}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-emerald-400 uppercase font-bold">${esc(o.status)} (${esc(o.deliveryEstimate)})</span>
+            <button data-accept-order="${esc(o.id)}" class="px-3 py-1.5 bg-emerald-500 text-black font-bold uppercase rounded">Accept (3-4 Days)</button>
+          </div>
+        </div>`).join("");
+
+      wrap.querySelectorAll("[data-accept-order]").forEach((b) => {
+        b.onclick = () => db.collection("orders").doc(b.dataset.acceptOrder).update({ status: "accepted", deliveryEstimate: "3-4 days" });
+      });
+    });
+  </script>
+</body>
+</html>

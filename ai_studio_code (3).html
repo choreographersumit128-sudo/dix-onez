@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DIX ONZE (1011) | Luxury Atelier</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root { --dx-bg: #070707; --dx-accent: #D4AF37; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--dx-bg); color: #F5F0E6; }
+    .font-serif-lux { font-family: 'Cormorant Garamond', Georgia, serif; }
+    .non-copyable-id {
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      -moz-user-select: none !important;
+      pointer-events: none !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased">
+
+  <!-- FULL SCREEN BAN OVERLAY (Triggered in real-time if Admin bans Reseller) -->
+  <div id="banned-screen" class="hidden fixed inset-0 z-[100] bg-red-950 flex flex-col items-center justify-center p-6 text-center space-y-5">
+    <div class="max-w-md border-2 border-red-500 bg-black/80 p-8 space-y-4">
+      <p class="text-xs uppercase tracking-[0.35em] text-red-400 font-bold">Security Enforcement</p>
+      <h1 class="font-serif-lux text-4xl text-red-500 font-bold">ACCOUNT BANNED BY ADMIN</h1>
+      <p class="text-xs text-red-200/80 leading-relaxed">
+        Your Reseller ID (<span id="banned-id-text" class="font-mono font-bold"></span>) has been suspended by DIX ONZE (1011) Administration. You cannot log in or place wholesale orders.
+      </p>
+      <button id="banned-logout-btn" class="px-6 py-2.5 bg-red-600 text-white text-xs font-bold uppercase tracking-widest">
+        Exit Reseller Account
+      </button>
+    </div>
+  </div>
+
+  <!-- Announcement Bar -->
+  <div id="announcement-bar" class="text-black text-[10px] sm:text-xs font-bold tracking-[0.22em] text-center py-2 px-4 uppercase" style="background: var(--dx-accent)">
+    DIX ONZE (1011) ARCHIVE DROP • ULTRA-LUXURY ATELIER • WORLDWIDE COURIER
+  </div>
+
+  <!-- TOP NAVIGATION BAR (Includes Reseller Wallet & + Add Balance when logged in) -->
+  <header class="sticky top-0 z-40 border-b border-white/10 backdrop-blur-md bg-black/90">
+    <div class="max-w-7xl mx-auto px-4 sm:px-8 min-h-20 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-6">
+        <a href="#top" id="brand-logo" class="font-serif-lux text-2xl sm:text-3xl tracking-[0.22em] font-semibold" style="color: var(--dx-accent)">
+          DIX ONZE (1011)
+        </a>
+        <nav class="hidden md:flex items-center gap-5 text-xs tracking-[0.2em] uppercase">
+          <a href="#collection" class="hover:opacity-75">Collection</a>
+          <a href="#reseller-portal" class="text-[#D4AF37] hover:opacity-80">♛ Reseller Portal</a>
+        </nav>
+      </div>
+
+      <!-- RESELLER WALLET HEADER WIDGET (Visible only when Reseller is Logged In) -->
+      <div id="nav-reseller-bar" class="hidden flex-wrap items-center gap-3 bg-[#141414] border border-[#D4AF37]/50 px-3.5 py-2">
+        <div class="text-left pr-2 border-r border-white/15">
+          <p id="nav-r-name" class="text-xs font-semibold text-white leading-tight">Reseller</p>
+          <p oncontextmenu="return false;" class="non-copyable-id font-mono text-[11px] text-[#D4AF37] tracking-widest" id="nav-r-id">DIX-XXXX</p>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <span class="text-xs font-semibold text-emerald-400">
+            Wallet Balance: <strong id="nav-r-balance" class="text-sm">Rs. 0</strong>
+          </span>
+          <button id="open-topup-btn" class="px-3 py-1.5 bg-[#D4AF37] text-black text-[11px] font-bold uppercase tracking-wider hover:opacity-90">
+            + Add Balance
+          </button>
+          <button id="reseller-logout-btn" class="px-2.5 py-1.5 border border-white/20 text-[10px] uppercase tracking-wider hover:border-red-400 hover:text-red-400">
+            Logout
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2.5">
+        <a href="#reseller-portal" id="mobile-reseller-link" class="md:hidden text-[11px] uppercase tracking-widest border border-[#D4AF37]/50 text-[#D4AF37] px-2.5 py-1.5">
+          Reseller
+        </a>
+        <button id="open-cart-btn" class="border border-white/20 hover:border-[#D4AF37] px-4 py-2 text-xs tracking-[0.18em] uppercase" style="color: var(--dx-accent)">
+          Bag (<span id="cart-count">0</span>)
+        </button>
+      </div>
+    </div>
+    <div id="reseller-warning-strip" class="hidden bg-amber-950/90 border-t border-amber-500/40 text-amber-200 text-xs text-center py-1.5 px-4"></div>
+  </header>
+
+  <!-- Hero Section -->
+  <section id="top" class="relative h-[56vh] flex items-center justify-center text-center overflow-hidden border-b border-white/10">
+    <img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1600&q=80" alt="Atelier" class="absolute inset-0 w-full h-full object-cover opacity-35" />
+    <div class="relative z-10 max-w-3xl px-6 space-y-5">
+      <p class="text-xs uppercase tracking-[0.38em]" style="color: var(--dx-accent)">MAISON DIX ONZE • EDITION 1011</p>
+      <h1 id="hero-title" class="font-serif-lux text-5xl sm:text-7xl leading-none">Quiet Luxury. Unthinkable Access.</h1>
+      <p class="text-sm opacity-80 max-w-xl mx-auto">Couture silhouettes crafted in limited runs at private archive pricing.</p>
+      <a href="#collection" class="inline-block px-9 py-3.5 text-black text-xs font-bold uppercase tracking-[0.25em]" style="background: var(--dx-accent)">
+        Explore The Drop
+      </a>
+    </div>
+  </section>
+
+  <!-- Product Catalog -->
+  <section id="collection" class="max-w-7xl mx-auto px-4 sm:px-8 py-16">
+    <div class="flex items-end justify-between border-b border-white/10 pb-5 mb-10">
+      <div>
+        <p id="catalog-mode-label" class="text-[11px] uppercase tracking-[0.3em]" style="color: var(--dx-accent)">Standard Retail Pricing</p>
+        <h2 class="font-serif-lux text-4xl mt-1">Current Release</h2>
+      </div>
+      <span id="product-count" class="text-xs uppercase tracking-widest opacity-60">0 Pieces</span>
+    </div>
+    <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+  </section>
+
+  <!-- RESELLER PORTAL (Register Rs. 500 w/ Screenshot + Reseller Login) -->
+  <section id="reseller-portal" class="border-t border-white/10 bg-[#0d0d0d] py-16">
+    <div class="max-w-6xl mx-auto px-4 sm:px-8 space-y-10">
+      <div class="text-center space-y-2">
+        <p class="text-xs uppercase tracking-[0.35em] text-[#D4AF37]">Partner Network</p>
+        <h2 class="font-serif-lux text-4xl sm:text-5xl">DIX ONZE Reseller Portal</h2>
+        <p class="text-xs opacity-65 max-w-lg mx-auto">Register with a Rs. 500 fee or log in with your Reseller ID to unlock wholesale rates and wallet checkout.</p>
+      </div>
+
+      <div class="grid lg:grid-cols-2 gap-8">
+        <!-- Become a Reseller (Rs. 500 Registration Fee + File Upload Screenshot) -->
+        <div class="bg-[#111111] border border-white/10 p-7 space-y-5">
+          <div>
+            <h3 class="font-serif-lux text-3xl text-[#D4AF37]">Become a Reseller (Register)</h3>
+            <p class="text-xs text-amber-300 mt-1 font-medium">
+              Rs. 500 registration fee required. Scan QR below and upload your payment screenshot.
+            </p>
+          </div>
+
+          <div class="bg-black border border-white/10 p-4 flex flex-col sm:flex-row items-center gap-4">
+            <img id="register-qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=DIX-ONZE-1011" alt="Payment QR" class="w-32 h-32 bg-white p-1.5 object-contain shrink-0" />
+            <div class="text-xs space-y-1.5">
+              <p class="uppercase tracking-widest text-[#D4AF37] font-bold">Registration Fee: Rs. 500</p>
+              <p class="opacity-70 leading-relaxed">Pay Rs. 500 via this QR code, upload your payment screenshot below, and Admin will activate your unique Reseller ID.</p>
+            </div>
+          </div>
+
+          <form id="reseller-register-form" class="space-y-3">
+            <input id="reg-name" required placeholder="Full Name *" class="w-full bg-black border border-white/15 px-4 py-3 text-sm outline-none focus:border-[#D4AF37]" />
+            <input id="reg-shop" required placeholder="Shop / Boutique Name *" class="w-full bg-black border border-white/15 px-4 py-3 text-sm outline-none focus:border-[#D4AF37]" />
+            <input id="reg-whatsapp" required placeholder="WhatsApp Number *" class="w-full bg-black border border-white/15 px-4 py-3 text-sm outline-none focus:border-[#D4AF37]" />
+            <div>
+              <label class="block text-[11px] uppercase tracking-widest opacity-70 mb-1.5">Upload Rs. 500 Payment Screenshot *</label>
+              <input id="reg-screenshot" type="file" accept="image/*" required class="w-full bg-black border border-dashed border-[#D4AF37]/50 px-3 py-2.5 text-xs" />
+            </div>
+            <button type="submit" id="reg-submit-btn" class="w-full py-3.5 border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition text-xs font-bold uppercase tracking-[0.22em]">
+              Submit Rs. 500 Registration
+            </button>
+          </form>
+        </div>
+
+        <!-- Reseller Login -->
+        <div class="bg-[#111111] border border-[#D4AF37]/30 p-7 flex flex-col justify-between space-y-6">
+          <div class="space-y-4">
+            <h3 class="font-serif-lux text-3xl text-[#D4AF37]">Reseller Login</h3>
+            <p class="text-xs opacity-70 leading-relaxed">
+              Enter your Admin-approved Reseller ID (e.g., <span class="font-mono text-[#D4AF37]">DIX-XXXX</span>) to unlock Reseller Wholesale Prices and pay from your Wallet Balance.
+            </p>
+            <form id="reseller-login-form" class="space-y-4 pt-2">
+              <input id="reseller-id-input" required placeholder="Enter Reseller ID (DIX-XXXX)" class="w-full bg-black border border-white/20 px-4 py-3.5 text-sm uppercase font-mono tracking-widest outline-none focus:border-[#D4AF37]" />
+              <p id="reseller-login-error" class="hidden text-xs text-red-400"></p>
+              <button type="submit" id="reseller-login-btn" class="w-full py-3.5 bg-[#D4AF37] text-black text-xs font-bold uppercase tracking-[0.22em] hover:opacity-90">
+                Activate Reseller Mode
+              </button>
+            </form>
+          </div>
+          <div class="border-t border-white/10 pt-4 text-[11px] opacity-55 space-y-1">
+            <p>• Real-time Wallet Balance shown in top navigation bar</p>
+            <p>• Instant "+ Add Balance" top-up with payment screenshot proof</p>
+            <p>• Automatic Reseller Wholesale Pricing across all items</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- + ADD BALANCE (TOP-UP WITH PAYMENT PROOF) MODAL -->
+  <div id="topup-modal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-[#111111] border border-[#D4AF37]/40 p-7 space-y-4 max-h-[92vh] overflow-y-auto">
+      <div class="flex justify-between items-center">
+        <h3 class="font-serif-lux text-2xl text-[#D4AF37]">+ Add Wallet Balance</h3>
+        <button id="close-topup-modal" class="text-xs opacity-60 hover:opacity-100">✕</button>
+      </div>
+
+      <div class="text-center space-y-2 bg-black p-4 border border-white/10">
+        <p class="text-[10px] uppercase tracking-[0.25em] text-[#D4AF37]">Scan Official Payment QR</p>
+        <img id="topup-qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=DIX-ONZE-1011" alt="Payment QR" class="w-44 h-44 mx-auto bg-white p-2 object-contain" />
+      </div>
+
+      <form id="topup-form" class="space-y-3">
+        <div>
+          <label class="block text-[11px] uppercase tracking-widest opacity-70 mb-1">Amount (Rs.) *</label>
+          <input id="topup-amount" type="number" min="100" value="5000" required class="w-full bg-black border border-white/15 px-3 py-2.5 text-sm outline-none focus:border-[#D4AF37]" />
+        </div>
+        <div>
+          <label class="block text-[11px] uppercase tracking-widest opacity-70 mb-1">Payment Method *</label>
+          <select id="topup-method" required class="w-full bg-black border border-white/15 px-3 py-2.5 text-sm outline-none focus:border-[#D4AF37]">
+            <option value="eSewa">eSewa</option>
+            <option value="Khalti">Khalti</option>
+            <option value="Bank">Bank Transfer</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[11px] uppercase tracking-widest opacity-70 mb-1">Upload Payment Screenshot *</label>
+          <input id="topup-screenshot" type="file" accept="image/*" required class="w-full bg-black border border-dashed border-[#D4AF37]/50 px-3 py-2.5 text-xs" />
+        </div>
+        <button type="submit" id="topup-submit-btn" class="w-full py-3.5 bg-[#D4AF37] text-black text-xs font-bold uppercase tracking-[0.22em]">
+          Submit Top-Up Request
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- CART & RETAIL CHECKOUT DRAWER -->
+  <div id="cart-drawer" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end">
+    <div class="w-full max-w-md bg-[#111111] border-l border-[#D4AF37]/40 h-full p-6 flex flex-col justify-between overflow-y-auto">
+      <div>
+        <div class="flex justify-between items-center border-b border-white/10 pb-4">
+          <h3 class="font-serif-lux text-2xl text-[#D4AF37]">ATELIER BAG</h3>
+          <button id="close-cart-btn" class="text-xs uppercase opacity-60 hover:opacity-100">Close ✕</button>
+        </div>
+        <div id="cart-items-list" class="py-4 space-y-3"></div>
+      </div>
+
+      <form id="checkout-form" class="border-t border-white/10 pt-4 space-y-3">
+        <div class="flex justify-between text-sm uppercase tracking-widest mb-2">
+          <span>Total (<span id="checkout-pcs">0</span> pcs)</span>
+          <span id="cart-subtotal" class="text-[#D4AF37] font-bold">Rs. 0</span>
+        </div>
+        <input id="co-name" required placeholder="Full Name *" class="w-full bg-black border border-white/15 px-3 py-2.5 text-xs" />
+        <input id="co-phone" required placeholder="Phone Number *" class="w-full bg-black border border-white/15 px-3 py-2.5 text-xs" />
+        <input id="co-wa" required placeholder="WhatsApp Number *" class="w-full bg-black border border-white/15 px-3 py-2.5 text-xs" />
+        <textarea id="co-loc" required rows="2" placeholder="Exact Delivery Location *" class="w-full bg-black border border-white/15 px-3 py-2.5 text-xs"></textarea>
+        <button type="submit" id="checkout-submit-btn" class="w-full py-3.5 bg-[#D4AF37] text-black text-xs font-bold uppercase tracking-[0.2em]">
+          Confirm Order
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <footer class="border-t border-white/10 py-10 text-center text-[11px] tracking-[0.25em] uppercase opacity-50">
+    © 2026 DIX ONZE (1011) ATELIER • ALL RIGHTS RESERVED
+  </footer>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyARovMYi9lRmJGAOjx0eLjb3s2J-BP9xHA",
+      authDomain: "dix-onez.firebaseapp.com",
+      projectId: "dix-onez",
+      storageBucket: "dix-onez.firebasestorage.app",
+      messagingSenderId: "1014731252422",
+      appId: "1:1014731252422:web:0360894379505015c42dc7",
+      measurementId: "G-CMR2NCN2XK"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let products = [];
+    let cart = [];
+    let activeReseller = null;
+    let resellerUnsub = null;
+
+    const fmt = (n) => "Rs. " + Number(n || 0).toLocaleString("en-NP");
+    const esc = (s) => String(s || "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+
+    function withTimeout(promise, ms = 12000) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Request timed out. Check internet or Firestore security rules.")), ms))
+      ]);
+    }
+
+    function compressImageToBase64(file, maxDim = 550, quality = 0.65) {
+      return new Promise((resolve, reject) => {
+        if (!file) return reject(new Error("No image file selected."));
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Could not read image file."));
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onerror = () => reject(new Error("Invalid image file."));
+          img.onload = () => {
+            let w = img.width;
+            let h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+              else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // 1. Live Site Settings & QR Sync
+    db.collection("settings").doc("siteConfig").onSnapshot((snap) => {
+      const cfg = snap.exists ? snap.data() : {};
+      const qr = cfg.qrCodeBase64 || cfg.qrCodeUrl || "https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=DIX-ONZE-1011";
+      if (cfg.bgColor) document.documentElement.style.setProperty("--dx-bg", cfg.bgColor);
+      if (cfg.accentColor) document.documentElement.style.setProperty("--dx-accent", cfg.accentColor);
+      if (cfg.brandName) document.getElementById("brand-logo").textContent = cfg.brandName;
+      if (cfg.heroTitle) document.getElementById("hero-title").textContent = cfg.heroTitle;
+      document.getElementById("register-qr-img").src = qr;
+      document.getElementById("topup-qr-img").src = qr;
+    });
+
+    // 2. Live Products Sync
+    db.collection("products").orderBy("createdAt", "desc").onSnapshot((snap) => {
+      products = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderProducts();
+      renderCart();
+    });
+
+    function getUnitPrice(p) {
+      return activeReseller
+        ? Number(p.resellerPrice || p.normalPrice || 0)
+        : Number(p.normalPrice || 0);
+    }
+
+    function renderProducts() {
+      const grid = document.getElementById("products-grid");
+      document.getElementById("product-count").textContent = `${products.length} Pieces`;
+      document.getElementById("catalog-mode-label").textContent = activeReseller
+        ? "Reseller Wholesale Pricing Active"
+        : "Standard Retail Pricing";
+
+      if (!products.length) {
+        grid.innerHTML = '<p class="col-span-full text-center py-16 text-xs uppercase tracking-widest opacity-50">No products available yet. Add products from Admin Panel.</p>';
+        return;
+      }
+
+      grid.innerHTML = products.map((p) => {
+        const normal = Number(p.normalPrice || 0);
+        const reseller = Number(p.resellerPrice || normal);
+        const displayPrice = activeReseller ? reseller : normal;
+        const strikePrice = activeReseller ? normal : Number(p.shockPrice || 0);
+        const showStrike = strikePrice > displayPrice;
+        const imgSrc = p.imageBase64 || p.imageUrl || "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=700&q=80";
+
+        return `
+          <div class="bg-[#111111] border border-white/10 hover:border-[#D4AF37]/60 transition flex flex-col">
+            <div class="relative aspect-[3/4] bg-black overflow-hidden">
+              <img src="${esc(imgSrc)}" alt="${esc(p.name)}" class="w-full h-full object-cover" />
+              ${activeReseller
+                ? '<span class="absolute top-3 left-3 bg-emerald-400 text-black text-[10px] font-bold tracking-widest px-2.5 py-1 uppercase">WHOLESALE RATE</span>'
+                : (showStrike ? `<span class="absolute top-3 left-3 bg-[#D4AF37] text-black text-[10px] font-bold tracking-widest px-2.5 py-1 uppercase">-${Math.round(((strikePrice - displayPrice) / strikePrice) * 100)}%</span>` : "")}
+            </div>
+            <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+              <div>
+                <p class="text-[10px] uppercase tracking-[0.25em] opacity-50">${esc(p.category || "Atelier")} • Stock: ${Number(p.stock || 0)}</p>
+                <h3 class="font-serif-lux text-2xl mt-1">${esc(p.name)}</h3>
+                <div class="flex items-baseline gap-3 mt-2">
+                  <span class="text-[#D4AF37] font-semibold text-lg">${fmt(displayPrice)}</span>
+                  ${showStrike ? `<span class="text-xs line-through opacity-40">${fmt(strikePrice)}</span>` : ""}
+                </div>
+              </div>
+              <div class="flex gap-2">
+                ${activeReseller
+                  ? `<button data-buy-wallet="${esc(p.id)}" ${Number(p.stock) <= 0 ? "disabled" : ""} class="flex-1 py-3 bg-[#D4AF37] text-black font-bold text-xs uppercase tracking-[0.18em] hover:opacity-90 disabled:opacity-30">
+                      ${Number(p.stock) > 0 ? "Buy Now (Wallet)" : "Sold Out"}
+                    </button>`
+                  : `<button data-add="${esc(p.id)}" ${Number(p.stock) <= 0 ? "disabled" : ""} class="flex-1 py-3 border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black text-xs uppercase tracking-[0.22em] transition disabled:opacity-30">
+                      ${Number(p.stock) > 0 ? "Buy Now / Bag" : "Sold Out"}
+                    </button>`}
+              </div>
+            </div>
+          </div>`;
+      }).join("");
+
+      grid.querySelectorAll("[data-add]").forEach((btn) => {
+        btn.onclick = () => addToCart(btn.dataset.add);
+      });
+      grid.querySelectorAll("[data-buy-wallet]").forEach((btn) => {
+        btn.onclick = () => buySingleWithWallet(btn.dataset.buyWallet, btn);
+      });
+    }
+
+    // 3. Direct Reseller Wallet Purchase ("Buy Now")
+    async function buySingleWithWallet(productId, btn) {
+      if (!activeReseller) return;
+      const p = products.find((x) => x.id === productId);
+      if (!p) return;
+      const price = Number(p.resellerPrice || p.normalPrice || 0);
+      const currentBal = Number(activeReseller.walletBalance || 0);
+
+      if (currentBal < price) {
+        alert("Insufficient Wallet Balance! Please Add Balance");
+        document.getElementById("topup-modal").classList.remove("hidden");
+        return;
+      }
+
+      const qtyStr = prompt(`Enter quantity for "${p.name}" (${fmt(price)} each):`, "1");
+      if (qtyStr === null) return;
+      const qty = Math.max(1, parseInt(qtyStr, 10) || 1);
+      const totalCost = price * qty;
+
+      if (currentBal < totalCost) {
+        alert(`Insufficient Wallet Balance! Needed ${fmt(totalCost)}, available ${fmt(currentBal)}. Please Add Balance.`);
+        document.getElementById("topup-modal").classList.remove("hidden");
+        return;
+      }
+
+      const oldText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Processing...";
+      try {
+        await withTimeout(db.runTransaction(async (tx) => {
+          const rRef = db.collection("resellers").doc(activeReseller.resellerId);
+          const pRef = db.collection("products").doc(p.id);
+          const rSnap = await tx.get(rRef);
+          const pSnap = await tx.get(pRef);
+
+          if (!rSnap.exists) throw new Error("Reseller record not found.");
+          if (rSnap.data().banStatus === "banned") throw new Error("ACCOUNT BANNED BY ADMIN.");
+          const bal = Number(rSnap.data().walletBalance || 0);
+          if (bal < totalCost) throw new Error("Insufficient Wallet Balance! Please Add Balance");
+
+          if (!pSnap.exists || Number(pSnap.data().stock || 0) < qty) throw new Error("Insufficient product stock.");
+
+          tx.update(rRef, { walletBalance: bal - totalCost });
+          tx.update(pRef, { stock: Number(pSnap.data().stock) - qty });
+
+          const oRef = db.collection("orders").doc();
+          tx.set(oRef, {
+            orderType: "reseller",
+            resellerId: activeReseller.resellerId,
+            customerName: `${activeReseller.name} (${activeReseller.shopName})`,
+            phone: activeReseller.whatsapp,
+            whatsapp: activeReseller.whatsapp,
+            deliveryLocation: activeReseller.shopName,
+            items: [{ productId: p.id, name: p.name, quantity: qty, unitPrice: price }],
+            totalPieces: qty,
+            totalAmount: totalCost,
+            status: "pending",
+            deliveryEstimate: "Pending Confirmation",
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+        }));
+        alert(`Purchase Confirmed! ${fmt(totalCost)} deducted from your Wallet Balance.`);
+      } catch (err) {
+        alert("Order Error: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = oldText;
+      }
+    }
+
+    // 4. Normal Retail Cart & Checkout
+    function addToCart(productId) {
+      const existing = cart.find((c) => c.productId === productId);
+      if (existing) existing.quantity++;
+      else cart.push({ productId, quantity: 1 });
+      renderCart();
+      document.getElementById("cart-drawer").classList.remove("hidden");
+    }
+
+    function renderCart() {
+      const list = document.getElementById("cart-items-list");
+      let total = 0;
+      let pieces = 0;
+
+      list.innerHTML = cart.length === 0
+        ? '<p class="text-center text-xs opacity-50 py-10 uppercase tracking-widest">Your bag is empty.</p>'
+        : cart.map((c, idx) => {
+            const p = products.find((x) => x.id === c.productId);
+            if (!p) return "";
+            const unit = getUnitPrice(p);
+            total += unit * c.quantity;
+            pieces += c.quantity;
+            const imgSrc = p.imageBase64 || p.imageUrl || "";
+            return `
+              <div class="flex gap-3 border-b border-white/10 pb-3 text-xs">
+                <img src="${esc(imgSrc)}" class="w-14 h-18 object-cover" />
+                <div class="flex-1">
+                  <p class="font-serif-lux text-base">${esc(p.name)}</p>
+                  <p class="text-[#D4AF37]">${fmt(unit)} × ${c.quantity}</p>
+                  <div class="flex gap-2 mt-1">
+                    <button type="button" data-dec="${idx}" class="px-2 border border-white/20">-</button>
+                    <span>${c.quantity}</span>
+                    <button type="button" data-inc="${idx}" class="px-2 border border-white/20">+</button>
+                  </div>
+                </div>
+              </div>`;
+          }).join("");
+
+      list.querySelectorAll("[data-inc]").forEach((b) => (b.onclick = () => { cart[b.dataset.inc].quantity++; renderCart(); }));
+      list.querySelectorAll("[data-dec]").forEach((b) => (b.onclick = () => {
+        cart[b.dataset.dec].quantity--;
+        if (cart[b.dataset.dec].quantity <= 0) cart.splice(b.dataset.dec, 1);
+        renderCart();
+      }));
+
+      document.getElementById("cart-count").textContent = pieces;
+      document.getElementById("checkout-pcs").textContent = pieces;
+      document.getElementById("cart-subtotal").textContent = fmt(total);
+      document.getElementById("checkout-submit-btn").textContent = `Confirm Order • ${fmt(total)}`;
+    }
+
+    document.getElementById("open-cart-btn").onclick = () => document.getElementById("cart-drawer").classList.remove("hidden");
+    document.getElementById("close-cart-btn").onclick = () => document.getElementById("cart-drawer").classList.add("hidden");
+
+    document.getElementById("checkout-form").onsubmit = async (e) => {
+      e.preventDefault();
+      if (!cart.length) return alert("Your bag is empty.");
+      const btn = document.getElementById("checkout-submit-btn");
+      const oldText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Placing Order...";
+
+      try {
+        const orderItems = cart.map((c) => {
+          const p = products.find((x) => x.id === c.productId);
+          return { productId: p.id, name: p.name, quantity: c.quantity, unitPrice: getUnitPrice(p) };
+        });
+        const totalPieces = orderItems.reduce((a, b) => a + b.quantity, 0);
+        const totalAmount = orderItems.reduce((a, b) => a + b.quantity * b.unitPrice, 0);
+
+        await withTimeout(db.collection("orders").add({
+          orderType: "retail",
+          customerName: document.getElementById("co-name").value.trim(),
+          phone: document.getElementById("co-phone").value.trim(),
+          whatsapp: document.getElementById("co-wa").value.trim(),
+          deliveryLocation: document.getElementById("co-loc").value.trim(),
+          items: orderItems,
+          totalPieces,
+          totalAmount,
+          status: "pending",
+          deliveryEstimate: "Pending Confirmation",
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }));
+
+        cart = [];
+        renderCart();
+        document.getElementById("checkout-form").reset();
+        document.getElementById("cart-drawer").classList.add("hidden");
+        alert("Order confirmed! Our concierge will contact you on WhatsApp.");
+      } catch (err) {
+        alert("Checkout Error: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = oldText;
+      }
+    };
+
+    // 5. Reseller Registration (Rs. 500 Fee + Compressed Base64 Screenshot)
+    document.getElementById("reseller-register-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("reg-submit-btn");
+      const file = document.getElementById("reg-screenshot").files[0];
+      if (!file) return alert("Please upload your Rs. 500 payment screenshot.");
+
+      btn.disabled = true;
+      btn.textContent = "Compressing & Sending...";
+      try {
+        const screenshotBase64 = await compressImageToBase64(file, 550, 0.65);
+        await withTimeout(db.collection("reseller_registrations").add({
+          name: document.getElementById("reg-name").value.trim(),
+          shopName: document.getElementById("reg-shop").value.trim(),
+          whatsapp: document.getElementById("reg-whatsapp").value.trim(),
+          feeAmount: 500,
+          screenshotBase64,
+          status: "pending",
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }));
+        e.target.reset();
+        alert("Registration request & screenshot sent! Once Admin approves, you will receive your Reseller ID.");
+      } catch (err) {
+        alert("Registration Failed: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Submit Rs. 500 Registration";
+      }
+    };
+
+    // 6. Reseller Login, Top Header Wallet & Real-Time Ban Screen
+    function activateReseller(resellerId) {
+      if (resellerUnsub) resellerUnsub();
+      resellerUnsub = db.collection("resellers").doc(resellerId).onSnapshot((snap) => {
+        if (!snap.exists) {
+          logoutReseller();
+          return;
+        }
+        const data = snap.data();
+        if (data.banStatus === "banned") {
+          document.getElementById("banned-id-text").textContent = data.resellerId;
+          document.getElementById("banned-screen").classList.remove("hidden");
+          return;
+        } else {
+          document.getElementById("banned-screen").classList.add("hidden");
+        }
+
+        activeReseller = { id: snap.id, ...data };
+        localStorage.setItem("dx_reseller_id", resellerId);
+
+        document.getElementById("nav-reseller-bar").classList.remove("hidden");
+        document.getElementById("nav-reseller-bar").classList.add("flex");
+        document.getElementById("nav-r-name").textContent = `${data.name} (${data.shopName})`;
+        document.getElementById("nav-r-id").textContent = data.resellerId;
+        document.getElementById("nav-r-balance").textContent = fmt(data.walletBalance);
+
+        const strip = document.getElementById("reseller-warning-strip");
+        if (data.warnings && data.warnings.length) {
+          strip.textContent = "Admin Notice: " + data.warnings[data.warnings.length - 1];
+          strip.classList.remove("hidden");
+        } else {
+          strip.classList.add("hidden");
+        }
+
+        renderProducts();
+      });
+    }
+
+    function logoutReseller() {
+      if (resellerUnsub) resellerUnsub();
+      activeReseller = null;
+      localStorage.removeItem("dx_reseller_id");
+      document.getElementById("banned-screen").classList.add("hidden");
+      document.getElementById("nav-reseller-bar").classList.add("hidden");
+      document.getElementById("nav-reseller-bar").classList.remove("flex");
+      document.getElementById("reseller-warning-strip").classList.add("hidden");
+      renderProducts();
+    }
+
+    const savedId = localStorage.getItem("dx_reseller_id");
+    if (savedId) activateReseller(savedId);
+
+    document.getElementById("reseller-logout-btn").onclick = logoutReseller;
+    document.getElementById("banned-logout-btn").onclick = logoutReseller;
+
+    document.getElementById("reseller-login-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById("reseller-login-error");
+      const btn = document.getElementById("reseller-login-btn");
+      errEl.classList.add("hidden");
+
+      const id = document.getElementById("reseller-id-input").value.trim().toUpperCase();
+      btn.disabled = true;
+      btn.textContent = "Verifying...";
+      try {
+        const snap = await withTimeout(db.collection("resellers").doc(id).get());
+        if (!snap.exists) {
+          errEl.textContent = "Invalid Reseller ID. Please register or verify with Admin.";
+          errEl.classList.remove("hidden");
+          return;
+        }
+        activateReseller(id);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Activate Reseller Mode";
+      }
+    };
+
+    // 7. "+ Add Balance" Top-Up Flow (Base64 Payment Screenshot)
+    document.getElementById("open-topup-btn").onclick = () => document.getElementById("topup-modal").classList.remove("hidden");
+    document.getElementById("close-topup-modal").onclick = () => document.getElementById("topup-modal").classList.add("hidden");
+
+    document.getElementById("topup-form").onsubmit = async (e) => {
+      e.preventDefault();
+      if (!activeReseller) return;
+      const btn = document.getElementById("topup-submit-btn");
+      const file = document.getElementById("topup-screenshot").files[0];
+      if (!file) return alert("Please upload your payment screenshot.");
+
+      btn.disabled = true;
+      btn.textContent = "Uploading Proof...";
+      try {
+        const screenshotBase64 = await compressImageToBase64(file, 550, 0.65);
+        await withTimeout(db.collection("topup_requests").add({
+          resellerId: activeReseller.resellerId,
+          name: activeReseller.name,
+          shopName: activeReseller.shopName,
+          whatsapp: activeReseller.whatsapp,
+          amount: Number(document.getElementById("topup-amount").value),
+          paymentMethod: document.getElementById("topup-method").value,
+          screenshotBase64,
+          status: "pending",
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }));
+        e.target.reset();
+        document.getElementById("topup-modal").classList.add("hidden");
+        alert("Top-up request & screenshot sent to Admin! Your balance will update automatically once approved.");
+      } catch (err) {
+        alert("Top-up Failed: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Submit Top-Up Request";
+      }
+    };
+  </script>
+</body>
+</html>
